@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>美博家长沟通 Agent</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <img src="./assets/meibo_logo.png" alt="美博">
+        <div>
+          <h1>家长沟通 Agent</h1>
+          <p>五类画像 · 38例匹配 · 冲刺策略 · 传播话术</p>
+        </div>
+      </div>
+      <div class="status">38例案例库</div>
+    </header>
+
+    <main class="shell">
+      <section class="workspace" aria-label="家长描述输入">
+        <div class="input-panel">
+          <div class="panel-head">
+            <h2>家长描述</h2>
+            <button class="ghost-btn" id="sampleBtn" type="button">填入样例</button>
+          </div>
+
+          <textarea id="parentText" rows="11" placeholder="例：高三孩子数学54分，基础题不稳定，导数和圆锥曲线基本不会；物理55分，综合题不会拆。目标重点本科，希望按各科当前分数段匹配详细提分路径和相近案例。"></textarea>
+
+          <div class="field-grid">
+            <label>
+              年级阶段
+              <select id="grade">
+                <option value="auto">自动判断</option>
+                <option value="高一/衔接">高一/衔接</option>
+                <option value="高二">高二</option>
+                <option value="高三">高三</option>
+                <option value="艺考文化课">艺考文化课</option>
+                <option value="全日制冲刺">全日制冲刺</option>
+              </select>
+            </label>
+
+            <label>
+              目标出口
+              <select id="target">
+                <option value="auto">自动判断</option>
+                <option value="清北/强基/顶尖985">清北/强基/顶尖985</option>
+                <option value="985/重点211">985/重点211</option>
+                <option value="211/重点本科">211/重点本科</option>
+                <option value="本科线/稳上线">本科线/稳上线</option>
+                <option value="艺考文化课">艺考文化课</option>
+              </select>
+            </label>
+
+            <label>
+              输出用途
+              <select id="mode">
+                <option value="cases" selected>案例速配（直接匹配）</option>
+                <option value="full">完整沟通方案</option>
+                <option value="consultant">咨询老师话术</option>
+                <option value="academic">教务/教研讲法</option>
+                <option value="share">家长传播短句</option>
+                <option value="followup">微信跟进</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="chips" aria-label="常见关注点">
+            <button type="button" data-chip="基础弱">基础弱</button>
+            <button type="button" data-chip="偏科">偏科</button>
+            <button type="button" data-chip="考试紧张">考试紧张</button>
+            <button type="button" data-chip="听懂不会做">听懂不会做</button>
+            <button type="button" data-chip="艺考文化课">艺考文化课</button>
+            <button type="button" data-chip="尖子冲高">尖子冲高</button>
+            <button type="button" data-chip="习惯松散">习惯松散</button>
+          </div>
+
+          <div class="actions">
+            <button class="primary-btn" id="generateBtn" type="button">生成结果</button>
+            <button class="secondary-btn" id="clearBtn" type="button">清空</button>
+          </div>
+        </div>
+
+        <aside class="history-panel" aria-label="最近生成">
+          <div class="panel-head">
+            <h2>最近生成</h2>
+            <button class="ghost-btn" id="clearHistoryBtn" type="button">清除</button>
+          </div>
+          <div id="historyList" class="history-list"></div>
+        </aside>
+      </section>
+
+      <section class="result-wrap" aria-live="polite">
+        <div class="result-toolbar">
+          <div>
+            <h2>生成结果</h2>
+            <p id="resultMeta">等待输入</p>
+          </div>
+          <div class="toolbar-actions">
+            <button class="secondary-btn" id="copyBtn" type="button">复制全部</button>
+            <button class="secondary-btn" id="downloadBtn" type="button">下载文本</button>
+          </div>
+        </div>
+        <div id="result" class="result-empty">
+          输入学生情况后，系统会直接给出优先使用案例、备用案例、匹配原因和可引用话术。
+        </div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
