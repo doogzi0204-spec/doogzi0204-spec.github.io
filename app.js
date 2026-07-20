@@ -284,21 +284,16 @@ const typeRules = [
     "name": "全日制冲刺型",
     "keywords": [
       "全日制",
-      "高三",
-      "冲刺",
-      "百日",
-      "时间短",
-      "每天",
-      "管理",
-      "艺考",
-      "体育生",
-      "文化课",
-      "本科线",
-      "一诊",
-      "二诊",
-      "三诊",
-      "高考",
-      "返藏"
+      "脱产",
+      "集训",
+      "封闭管理",
+      "返藏",
+      "艺考文化课",
+      "体育生文化课",
+      "百日冲线",
+      "短期集训",
+      "集中冲刺",
+      "每日闭环"
     ],
     "cases": [
       "芦晓娴",
@@ -1169,10 +1164,29 @@ function normalizeText(value) {
   return String(value).replace(/\s+/g, "").toLowerCase();
 }
 
+function fulltimeEvidence(text) {
+  const explicitHits = keywordHits(text, ["全日制", "脱产", "集训", "封闭管理", "返藏"]);
+  const artOrSports = /艺考|艺体|体育生/.test(text) && /文化课|冲线|冲刺|集训/.test(text);
+  const urgent = /百日|时间短|最后\s*\d+\s*天|最后阶段|短期|冲线/.test(text);
+  const intensive = /每天|每日|全天|集中管理|集训|脱产|全日制/.test(text);
+  const seniorStage = /高三|高考|一诊|二诊|三诊/.test(text);
+  const hits = explicitHits.slice();
+  let score = explicitHits.length * 4;
+  if (artOrSports) {
+    score += 4;
+    hits.push("艺体文化课集中冲刺");
+  }
+  if (urgent && intensive && seniorStage) {
+    score += 3;
+    hits.push("时间紧+集中管理+高考阶段");
+  }
+  return { score: score, hits: uniqueItems(hits) };
+}
+
 function inferStage(text, chosenGrade) {
   if (chosenGrade !== "auto") return chosenGrade;
   if (/艺考|文化课/.test(text)) return "艺考文化课";
-  if (/全日制|百日|冲刺/.test(text)) return "全日制冲刺";
+  if (fulltimeEvidence(text).score > 0) return "全日制冲刺";
   if (/高三|高考|一诊|二诊|三诊/.test(text)) return "高三";
   if (/高二/.test(text)) return "高二";
   if (/高一|初升高|衔接|分班/.test(text)) return "高一/衔接";
@@ -1279,14 +1293,16 @@ function makeSubjectPlans(subjects, scores, targets, fallbackLevelId, text) {
     const score = scores[subject];
     const target = targets[subject];
     const band = getSubjectBand(subject, score, fallbackLevelId);
+    const level = sprintLevels.find(function (item) { return item.id === band.levelId; }) || sprintLevels[0];
     const painHits = keywordHits(text, subjectPainKeywords[subject] || []);
     return {
       subject: subject,
       score: Number.isFinite(score) ? score : null,
       target: Number.isFinite(target) ? target : null,
       levelId: band.levelId,
+      levelName: level.name,
       bandIndex: band.bandIndex,
-      scoreLabel: Number.isFinite(score) ? score + "分｜" + band.label : "分数待确认｜暂按" + band.label,
+      scoreLabel: Number.isFinite(score) ? score + "分｜" + level.name + "｜" + band.label : "分数待确认｜暂按" + level.name + "｜" + band.label,
       diagnosis: band.diagnosis,
       priorities: band.priorities,
       actions: band.actions,
@@ -1320,11 +1336,13 @@ function productSystem(target, stage) {
 
 function rankTypes(text) {
   const scored = typeRules.map((rule) => {
-    const hits = keywordHits(text, rule.keywords);
+    const evidence = rule.id === "fulltime"
+      ? fulltimeEvidence(text)
+      : { score: keywordHits(text, rule.keywords).length, hits: keywordHits(text, rule.keywords) };
     return {
       ...rule,
-      score: hits.length,
-      hits
+      score: evidence.score,
+      hits: evidence.hits
     };
   });
   scored.sort((a, b) => b.score - a.score);
@@ -1337,6 +1355,7 @@ function rankCases(text, types, sprint, subjectPlans, stage) {
   const primary = types[0];
   const secondary = types[1] || types[0];
   const explicitPlans = subjectPlans.filter(function (plan) { return Number.isFinite(plan.score); });
+  const levelOrder = { foundation: 0, framework: 1, thinking: 2, stability: 3 };
   return Object.entries(caseCards)
     .map(function (entry, order) {
       const name = entry[0];
@@ -1361,14 +1380,17 @@ function rankCases(text, types, sprint, subjectPlans, stage) {
           return;
         }
         const caseBand = getSubjectBand(plan.subject, caseScore, plan.levelId);
-        const gap = Math.abs(plan.bandIndex - caseBand.bandIndex);
+        const gap = Math.abs(levelOrder[plan.levelId] - levelOrder[caseBand.levelId]);
         const distance = Math.abs(plan.score - caseScore);
-        if (gap === 0) {
+        const maxScore = subjectBandStrategies[plan.subject].maxScore;
+        const sameLayerDistance = maxScore * 0.2;
+        const adjacentLayerDistance = maxScore * 0.15;
+        if (gap === 0 && distance <= sameLayerDistance) {
           score += 18 + Math.max(0, 8 - Math.floor(distance / 5));
-          scoreReasons.push(plan.subject + "同属“" + caseBand.label + "”（案例起点" + caseScore + "分）");
-        } else if (gap === 1) {
+          scoreReasons.push(plan.subject + "同属“" + plan.levelName + "”（当前" + plan.score + "分，案例起点" + caseScore + "分）");
+        } else if (gap === 1 && distance <= adjacentLayerDistance) {
           score += 6 + Math.max(0, 4 - Math.floor(distance / 10));
-          scoreReasons.push(plan.subject + "为相邻分数段（当前" + plan.score + "分，案例起点" + caseScore + "分）");
+          scoreReasons.push(plan.subject + "处在相邻层级且分差接近（当前" + plan.score + "分，案例起点" + caseScore + "分）");
         } else {
           incompatible = true;
           score -= 80;
@@ -1419,11 +1441,7 @@ function buildOutput() {
   const concern = mainType.concern;
   const modeName = {
     cases: "案例速配",
-    full: "完整沟通方案",
-    consultant: "咨询老师话术",
-    academic: "教务/教研讲法",
-    share: "家长传播短句",
-    followup: "微信跟进"
+    full: "完整沟通方案"
   }[mode];
 
   const scoreSummary = subjectPlans.filter((item) => Number.isFinite(item.score)).map((item) => item.subject + item.score + "分").join("、");
@@ -1517,11 +1535,7 @@ function makeFocusLines(mode, data) {
     full: [
       `先用“${data.mainType.name}”做初步画像，再把${data.system}讲成家长听得懂的成长路径。`,
       `同时呈现分数、能力、特质三层变化，避免只讲分数。`
-    ],
-    consultant: data.consultantLines.slice(0, 3),
-    academic: data.teacherLines.slice(0, 3),
-    share: data.shareLines.slice(0, 3),
-    followup: data.followup
+    ]
   };
   return map[mode] || map.full;
 }
@@ -1737,7 +1751,7 @@ function renderOutput(data) {
           <strong>${escapeHtml(data.sprint.name)}</strong>
           <p>${escapeHtml(data.sprint.diagnosis)}</p>
           <p>${escapeHtml(data.sprint.strategy)}</p>
-          <p><b>匹配原则：</b>有具体单科分数时，以分数段为硬约束；目标985、211等只影响后续目标，不会把54分直接套入90-110分方案。</p>
+          <p><b>匹配原则：</b>有具体单科分数时，先按四个层级锁定当前层，再校验案例起点分差；目标985、211等只影响后续目标，不会把54分直接套入90-110分方案。</p>
         </div>
         ${renderSubjectStrategySection(data, true)}
       </article>
