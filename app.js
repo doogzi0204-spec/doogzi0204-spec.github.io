@@ -1319,10 +1319,14 @@ function sprintFromSubjectPlans(plans, fallbackSprint) {
   const levelOrder = { foundation: 0, framework: 1, thinking: 2, stability: 3 };
   const scoredPlans = plans.filter(function (plan) { return Number.isFinite(plan.score); });
   if (!scoredPlans.length) return fallbackSprint;
-  const priorityPlan = scoredPlans.slice().sort(function (a, b) {
-    return levelOrder[a.levelId] - levelOrder[b.levelId];
-  })[0];
-  return sprintLevels.find(function (level) { return level.id === priorityPlan.levelId; }) || fallbackSprint;
+  const weighted = scoredPlans.reduce(function (summary, plan) {
+    const weight = subjectBandStrategies[plan.subject].maxScore;
+    summary.points += levelOrder[plan.levelId] * weight;
+    summary.weight += weight;
+    return summary;
+  }, { points: 0, weight: 0 });
+  const overallIndex = Math.max(0, Math.min(3, Math.round(weighted.points / weighted.weight)));
+  return sprintLevels[overallIndex] || fallbackSprint;
 }
 
 function productSystem(target, stage) {
@@ -1748,10 +1752,11 @@ function renderOutput(data) {
       <article class="result-card full">
         <h3>高考冲刺提分策略</h3>
         <div class="strategy-main strategy-overview">
-          <strong>${escapeHtml(data.sprint.name)}</strong>
+          <strong>综合主策略：${escapeHtml(data.sprint.name)}</strong>
           <p>${escapeHtml(data.sprint.diagnosis)}</p>
           <p>${escapeHtml(data.sprint.strategy)}</p>
-          <p><b>匹配原则：</b>有具体单科分数时，先按四个层级锁定当前层，再校验案例起点分差；目标985、211等只影响后续目标，不会把54分直接套入90-110分方案。</p>
+          <p><b>层级说明：</b>综合主策略按已录入学科的整体结构判断；每个学科仍按自己的当前分数单独落层，不能用最低一科代替整个人，也不能用985目标把低分科直接抬高。</p>
+          <p><b>案例原则：</b>先按单科四个层级锁定当前层，再校验案例起点分差；例如数学54分仍属于第一层，不会直接套入90-110分方案。</p>
         </div>
         ${renderSubjectStrategySection(data, true)}
       </article>
